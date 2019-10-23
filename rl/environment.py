@@ -122,6 +122,6 @@ class SubprocVecEnv:
 def make_sc2env(**kwargs):
   interface_format = sc2_env.parse_agent_interface_format(feature_screen=kwargs.pop('screen_size_px'),
                                                           feature_minimap=kwargs.pop('minimap_size_px'))
-  env = sc2_env.SC2Env(**kwargs, agent_interface_format=interface_format)
+  env = sc2_env.SC2Env(**kwargs, players=[sc2_env.Agent(sc2_env.Race.terran)], agent_interface_format=interface_format)
   # env = available_actions_printer.AvailableActionsPrinter(env)
   return env
