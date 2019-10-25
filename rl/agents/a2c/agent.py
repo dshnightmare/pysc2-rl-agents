@@ -186,9 +186,10 @@ class A2CAgent():
       samples_fn, samples_args, value = self.sess.run([self.samples_fn, self.samples_args, self.value],
                                                       feed_dict=feed_dict)
     elif self.network_cls == ArFullyConv:
-      samples_fn, value = self.sess.run([self.samples_fn, self.value], feed_dict=feed_dict)
-      feed_dict.update({self.actions[0]: samples_fn})
-      samples_args = self.sess.run(self.samples_args, feed_dict=feed_dict)
+      setup = self.sess.partial_run_setup([self.samples_fn, self.samples_args, self.value],
+                                          [k for k in feed_dict] + [self.actions[0]])
+      samples_fn, value = self.sess.partial_run(setup, [self.samples_fn, self.value], feed_dict=feed_dict)
+      samples_args = self.sess.partial_run(setup, self.samples_args, feed_dict={self.actions[0]: samples_fn})
     else:
       raise ValueError
     return (samples_fn, samples_args), value
