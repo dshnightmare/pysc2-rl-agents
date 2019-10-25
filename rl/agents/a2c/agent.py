@@ -7,6 +7,7 @@ from tensorflow.contrib.distributions import Categorical
 from pysc2.lib.actions import TYPES as ACTION_TYPES
 
 from rl.networks.fully_conv import FullyConv
+from rl.networks.ar_fully_conv import ArFullyConv
 from rl.util import safe_log, safe_div
 
 
@@ -17,7 +18,7 @@ class A2CAgent():
   """
   def __init__(self,
                sess,
-               network_cls=FullyConv,
+               network_cls,
                network_data_format='NCHW',
                value_loss_weight=0.5,
                entropy_weight=1e-3,
@@ -70,17 +71,23 @@ class A2CAgent():
     self.returns = returns
     self.available_actions = available_actions
 
-    policy, value = self.network_cls(data_format=self.network_data_format).build(
-        screen, minimap, flat)
-    self.policy = policy
-    self.value = value
-
     fn_id = tf.placeholder(tf.int32, [None], 'fn_id')
     arg_ids = {
-        k: tf.placeholder(tf.int32, [None], 'arg_{}_id'.format(k.id))
-        for k in policy[1].keys()}
+      k: tf.placeholder(tf.int32, [None], 'arg_{}_id'.format(k.id))
+      for k in ACTION_TYPES}
     actions = (fn_id, arg_ids)
     self.actions = actions
+
+    if self.network_cls == FullyConv:
+      policy, value = self.network_cls(data_format=self.network_data_format).build(
+        screen, minimap, flat)
+    elif self.network_cls == ArFullyConv:
+      policy, value = self.network_cls(data_format=self.network_data_format).build(
+          screen, minimap, flat, actions)
+    else:
+      raise ValueError
+    self.policy = policy
+    self.value = value
 
     log_probs = compute_policy_log_probs(available_actions, policy, actions)
 
@@ -118,7 +125,9 @@ class A2CAgent():
         learning_rate=None,
         name="train_op")
 
-    self.samples = sample_actions(available_actions, policy)
+    self.samples_fn = sample_actions_fn(available_actions, policy[0])
+    self.samples_args = sample_actions_args(policy[1])
+    # self.samples = (self.samples_fn, self.samples_args)
 
   def get_obs_feed(self, obs):
     return {self.screen: obs['screen'],
@@ -173,7 +182,16 @@ class A2CAgent():
       values: array of shape [num_batch] containing value estimates.
     """
     feed_dict = self.get_obs_feed(obs)
-    return self.sess.run([self.samples, self.value], feed_dict=feed_dict)
+    if self.network_cls == FullyConv:
+      samples_fn, samples_args, value = self.sess.run([self.samples_fn, self.samples_args, self.value],
+                                                      feed_dict=feed_dict)
+    elif self.network_cls == ArFullyConv:
+      samples_fn, value = self.sess.run([self.samples_fn, self.value], feed_dict=feed_dict)
+      feed_dict.update({self.actions[0]: samples_fn})
+      samples_args = self.sess.run(self.samples_args, feed_dict=feed_dict)
+    else:
+      raise ValueError
+    return (samples_fn, samples_args), value
 
   def get_value(self, obs):
     return self.sess.run(
@@ -236,13 +254,12 @@ def compute_policy_entropy(available_actions, policy, actions):
 
   return entropy
 
+def sample(probs):
+  dist = Categorical(probs=probs)
+  return dist.sample()
 
 def sample_actions(available_actions, policy):
   """Sample function ids and arguments from a predicted policy."""
-
-  def sample(probs):
-    dist = Categorical(probs=probs)
-    return dist.sample()
 
   fn_pi, arg_pis = policy
   fn_pi = mask_unavailable_actions(available_actions, fn_pi)
@@ -254,6 +271,18 @@ def sample_actions(available_actions, policy):
 
   return fn_samples, arg_samples
 
+def sample_actions_fn(available_actions, fn_pi):
+  fn_pi = mask_unavailable_actions(available_actions, fn_pi)
+  fn_samples = sample(fn_pi)
+
+  return fn_samples
+
+def sample_actions_args(arg_pis):
+  arg_samples = dict()
+  for arg_type, arg_pi in arg_pis.items():
+    arg_samples[arg_type] = sample(arg_pi)
+
+  return arg_samples
 
 def compute_policy_log_probs(available_actions, policy, actions):
   """Compute action log probabilities given predicted policies and selected

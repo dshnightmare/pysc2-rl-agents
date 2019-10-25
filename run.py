@@ -10,6 +10,7 @@ import tensorflow as tf
 from rl.agents.a2c.runner import A2CRunner
 from rl.agents.a2c.agent import A2CAgent
 from rl.networks.fully_conv import FullyConv
+from rl.networks.ar_fully_conv import ArFullyConv
 from rl.environment import SubprocVecEnv, make_sc2env, SingleEnv
 
 
@@ -115,6 +116,7 @@ def main():
 
     agent = A2CAgent(
         sess=sess,
+        network_cls=ArFullyConv,
         network_data_format=network_data_format,
         value_loss_weight=args.value_loss_weight,
         entropy_weight=args.entropy_weight,
