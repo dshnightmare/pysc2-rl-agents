@@ -21,7 +21,7 @@ FLAGS(['run.py'])
 
 
 parser = argparse.ArgumentParser(description='Starcraft 2 deep RL agents')
-parser.add_argument('experiment_id', type=str,
+parser.add_argument('--experiment_id', type=str,
                     help='identifier to store experiment results')
 parser.add_argument('--eval', action='store_true',
                     help='if false, episode scores are evaluated')
@@ -75,7 +75,7 @@ args.train = not args.eval
 os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
 
 
-ckpt_path = os.path.join(args.save_dir, args.experiment_id)
+ckpt_path = os.path.join(args.save_dir, args.map, args.experiment_id)
 summary_type = 'train' if args.train else 'eval'
 summary_path = os.path.join(args.summary_dir, args.experiment_id, summary_type)
 
