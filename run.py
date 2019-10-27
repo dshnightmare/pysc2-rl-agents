@@ -21,7 +21,7 @@ FLAGS(['run.py'])
 
 
 parser = argparse.ArgumentParser(description='Starcraft 2 deep RL agents')
-parser.add_argument('--experiment_id', type=str,
+parser.add_argument('experiment_id', type=str,
                     help='identifier to store experiment results')
 parser.add_argument('--eval', action='store_true',
                     help='if false, episode scores are evaluated')
